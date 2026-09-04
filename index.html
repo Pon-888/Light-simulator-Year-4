@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>光的直线传播与光谱色模拟器</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #f0f2f5;
+      /* 全局优先使用楷体 */
+      font-family: "楷体", "Kaiti", "STKaiti", "KaiTi_GB2312", serif, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      background: #ffffff;
+      padding: 10px 20px;
+      border-bottom: 2px solid #ccc;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    header h2 {
+      color: #000000; /* 纯黑强调 */
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 1px;
+    }
+    header p {
+      color: #222222; /* 加深说明文字 */
+      font-size: 15px;
+      font-weight: bold;
+      margin-top: 4px;
+    }
+    
+    /* 主工作区：左边栏 + 中间画板 + 右边栏 */
+    .main-container {
+      display: flex;
+      flex: 1;
+      padding: 12px;
+      gap: 12px;
+      height: calc(100vh - 75px);
+    }
+
+    .sidebar {
+      width: 250px;
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+
+    .panel-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    /* 重点标题：纯黑加粗大字体 */
+    .panel-group label {
+      font-weight: 900;
+      color: #000000;
+      font-size: 16px;
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .btn-group button, .lang-grid button {
+      padding: 8px 10px;
+      border: 2px solid #1565C0;
+      background-color: #f4f8fb;
+      color: #0d47a1;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 900; /* 按钮文字加粗 */
+      font-size: 15px;
+      font-family: inherit;
+      text-align: left;
+      transition: 0.2s;
+    }
+    .btn-group button:hover {
+      background-color: #1565C0;
+      color: #ffffff;
+    }
+    /* 选中的按钮：深色背景 + 亮白字 */
+    .btn-group button.active {
+      background-color: #0D47A1;
+      color: #ffffff;
+      border-color: #002171;
+    }
+
+    /* 语言网格 */
+    .lang-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .lang-grid button {
+      border: 2px solid #555;
+      background: #ffffff;
+      color: #000000;
+      text-align: center;
+      font-size: 14px;
+      padding: 6px;
+    }
+    .lang-grid button.active {
+      background: #880e4f;
+      color: #ffffff;
+      border-color: #4a0007;
+    }
+
+    /* 光谱颜色专属网格 */
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .color-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid #777;
+      cursor: pointer;
+      transition: transform 0.2s, border-color 0.2s;
+      justify-self: center;
+    }
+    .color-btn:hover {
+      transform: scale(1.15);
+    }
+    .color-btn.active {
+      border: 4px solid #000;
+      transform: scale(1.2);
+      box-shadow: 0 0 8px rgba(0,0,0,0.6);
+    }
+
+    /* 中间画布区 */
+    .canvas-container {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #ffffff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      position: relative;
+    }
+    canvas {
+      border-radius: 6px;
+      background-color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h2 id="title">光的直线传播、透光性与光谱颜色探究</h2>
+    <p id="subtitle">💡 切换光谱颜色，探究光的颜色是否会影响影子的颜色与形状！</p>
+  </header>
+
+  <div class="main-container">
+    <!-- 左侧控制面板 -->
+    <div class="sidebar">
+      <!-- 0. 语言选择 -->
+      <div class="panel-group">
+        <label>🌐 Bahasa / 语言:</label>
+        <div class="lang-grid">
+          <button class="lang-btn active" onclick="setLanguage('zh', this)">华语</button>
+          <button class="lang-btn" onclick="setLanguage('ms', this)">Melayu</button>
+          <button class="lang-btn" onclick="setLanguage('en', this)">English</button>
+          <button class="lang-btn" onclick="setLanguage('ta', this)">தமிழ்</button>
+        </div>
+      </div>
+
+      <hr style="border:0; border-top:2px solid #ddd;">
+
+      <!-- 1. 光源选择 -->
+      <div class="panel-group">
+        <label id="lblLight">1. 光源选择:</label>
+        <div class="btn-group">
+          <button id="btnFlashlight" class="active" onclick="changeLightType('flashlight')">🔦 手电筒</button>
+          <button id="btnSun" onclick="changeLightType('sun')">☀️ 太阳</button>
+        </div>
+      </div>
+
+      <!-- 2. 形状选择 -->
+      <div class="panel-group">
+        <label id="lblShape">2. 物体形状:</label>
+        <div class="btn-group">
+          <button id="btnRectangle" class="active" onclick="changeShape('rectangle')">长方形</button>
+          <button id="btnCircle" onclick="changeShape('circle')">球体</button>
+          <button id="btnTriangle" onclick="changeShape('triangle')">三角形</button>
+        </div>
+      </div>
+
+      <!-- 3. 透光度 -->
+      <div class="panel-group">
+        <label id="lblTrans">3. 材质透光度:</label>
+        <div class="btn-group">
+          <button id="btnOpaque" class="active" onclick="changeTransparency('opaque')">🪵 不透明</button>
+          <button id="btnTranslucent" onclick="changeTransparency('translucent')">🥛 半透明</button>
+          <button id="btnTransparent" onclick="changeTransparency('transparent')">🔍 透明</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中间：画布 -->
+    <div class="canvas-container">
+      <canvas id="simCanvas" width="1000" height="520"></canvas>
+    </div>
+
+    <!-- 右侧控制面板 -->
+    <div class="sidebar">
+      <!-- 4. 光谱颜色 -->
+      <div class="panel-group" style="background: #fff0f5; padding: 10px; border-radius: 8px; border: 2px solid #f48fb1;">
+        <label id="lblSpectrum" style="color: #880e4f;">🌈 光谱颜色:</label>
+        <div class="color-grid">
+          <button class="color-btn active" style="background-color: #FFEE58;" title="Yellow" onclick="changeLightColor('#FFEE58', 'rgba(255, 235, 59,', this)"></button>
+          <button class="color-btn" style="background-color: #FF5252;" title="Red" onclick="changeLightColor('#FF5252', 'rgba(255, 82, 82,', this)"></button>
+          <button class="color-btn" style="background-color: #66BB6A;" title="Green" onclick="changeLightColor('#66BB6A', 'rgba(102, 187, 106,', this)"></button>
+          <button class="color-btn" style="background-color: #26C6DA;" title="Cyan" onclick="changeLightColor('#26C6DA', 'rgba(38, 198, 218,', this)"></button>
+          <button class="color-btn" style="background-color: #42A5F5;" title="Blue" onclick="changeLightColor('#42A5F5', 'rgba(66, 165, 245,', this)"></button>
+          <button class="color-btn" style="background-color: #AB47BC;" title="Purple" onclick="changeLightColor('#AB47BC', 'rgba(171, 71, 188,', this)"></button>
+          <button class="color-btn" style="background-color: #FFFFFF;" title="White" onclick="changeLightColor('#FFFFFF', 'rgba(255, 255, 255,', this)"></button>
+        </div>
+      </div>
+
+      <!-- 5. 亮度调节 (手电筒模式) -->
+      <div class="panel-group" id="flashlightSliderBox">
+        <label id="lblBrightness" for="lightBrightnessSlider">💡 亮度: <strong id="brightnessLabel" style="color: #000000; font-size: 17px;">70%</strong></label>
+        <input type="range" id="lightBrightnessSlider" min="20" max="100" value="70" oninput="updateBrightness(this.value)" style="width: 100%;">
+      </div>
+
+      <!-- 6. 太阳角度/时间调节 (太阳模式) -->
+      <div class="panel-group" id="sunSliderBox" style="display: none;">
+        <label id="lblSunAngle" for="sunAngleSlider">☀️ 太阳角度/时间:</label>
+        <input type="range" id="sunAngleSlider" min="15" max="165" value="30" oninput="updateSunAngle(this.value)" style="width: 100%;">
+        <div style="display: flex; justify-content: space-between; font-size: 14px; color: #000; font-weight: bold; margin-top: 2px;">
+          <span id="lblMorning">早晨</span>
+          <span id="lblEvening">傍晚</span>
+        </div>
+        <strong id="timeLabel" style="color: #000000; font-size: 15px; margin-top: 4px;">08:00 AM (角度: 30°)</strong>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const translations = {
+      zh: {
+        title: "光的直线传播、透光性与光谱颜色探究",
+        subtitle: "💡 切换光谱颜色，探究光的颜色是否会影响影子的颜色与形状！",
+        lblLight: "1. 光源选择:",
+        btnFlashlight: "🔦 手电筒",
+        btnSun: "☀️ 太阳",
+        lblShape: "2. 物体形状:",
+        btnRectangle: "长方形",
+        btnCircle: "球体",
+        btnTriangle: "三角形",
+        lblTrans: "3. 材质透光度:",
+        btnOpaque: "🪵 不透明",
+        btnTranslucent: "🥛 半透明",
+        btnTransparent: "🔍 透明",
+        lblSpectrum: "🌈 光谱颜色:",
+        lblBrightness: "💡 亮度:",
+        lblSunAngle: "☀️ 太阳角度/时间:",
+        lblMorning: "早晨",
+        lblEvening: "傍晚",
+        screenTitle: "正面投影屏",
+        distLabel: "距离",
+        shadowLenLabel: "影子长度",
+        conclusion: "🔍 科学结论：光的颜色只会改变周围亮区，【影子的颜色依然是暗黑色的】！",
+        timeMorning: "早晨",
+        timeForenoon: "上午",
+        timeNoon: "正午",
+        timeAfternoon: "下午",
+        timeEvening: "傍晚"
+      },
+      ms: {
+        title: "Penyiasatan Pembentukan Bayang-bayang & Warna Spektrum Cahaya",
+        subtitle: "💡 Tukar warna cahaya untuk menyiasat sama ada warna cahaya mempengaruhi warna bayang-bayang!",
+        lblLight: "1. Sumber Cahaya:",
+        btnFlashlight: "🔦 Lampu Suluh",
+        btnSun: "☀️ Matahari",
+        lblShape: "2. Bentuk Objek:",
+        btnRectangle: "Segi Empat",
+        btnCircle: "Sfera",
+        btnTriangle: "Segi Tiga",
+        lblTrans: "3. Kejelasan Objek:",
+        btnOpaque: "🪵 Legap",
+        btnTranslucent: "🥛 Lurang",
+        btnTransparent: "🔍 Lut Sinar",
+        lblSpectrum: "🌈 Warna Spektrum:",
+        lblBrightness: "💡 Kecerahan:",
+        lblSunAngle: "☀️ Sudut Matahari / Masa:",
+        lblMorning: "Pagi",
+        lblEvening: "Petang",
+        screenTitle: "Skrin Bayang",
+        distLabel: "Jarak",
+        shadowLenLabel: "Panjang Bayang",
+        conclusion: "🔍 Kesimpulan: Warna cahaya hanya mengubah kawasan terang, warna bayang-bayang TETAP GELAP!",
+        timeMorning: "Pagi",
+        timeForenoon: "Pagi",
+        timeNoon: "Tengah Hari",
+        timeAfternoon: "Petang",
+        timeEvening: "Petang"
+      },
+      en: {
+        title: "Light Travel, Transparency & Light Spectrum Investigation",
+        subtitle: "💡 Change light colors to investigate if light color affects the shadow color!",
+        lblLight: "1. Light Source:",
+        btnFlashlight: "🔦 Flashlight",
+        btnSun: "☀️ Sun",
+        lblShape: "2. Object Shape:",
+        btnRectangle: "Rectangle",
+        btnCircle: "Sphere",
+        btnTriangle: "Triangle",
+        lblTrans: "3. Transparency:",
+        btnOpaque: "🪵 Opaque",
+        btnTranslucent: "🥛 Translucent",
+        btnTransparent: "🔍 Transparent",
+        lblSpectrum: "🌈 Spectrum Color:",
+        lblBrightness: "💡 Brightness:",
+        lblSunAngle: "☀️ Sun Angle / Time:",
+        lblMorning: "Morning",
+        lblEvening: "Evening",
+        screenTitle: "Shadow Screen",
+        distLabel: "Distance",
+        shadowLenLabel: "Shadow Length",
+        conclusion: "🔍 Scientific Conclusion: Light color only changes the bright area. Shadow color STAYS DARK!",
+        timeMorning: "Morning",
+        timeForenoon: "Forenoon",
+        timeNoon: "Noon",
+        timeAfternoon: "Afternoon",
+        timeEvening: "Evening"
+      },
+      ta: {
+        title: "ஒளிப் பயணம், ஒளி புகுந்தன்மை & நிறமாலை ஆராய்ச்சி",
+        subtitle: "💡 ஒளியின் நிறம் நிழலின் நிறத்தைப் பாதிக்குமா என்பதை ஆராயுங்கள்!",
+        lblLight: "1. ஒளி மூலம்:",
+        btnFlashlight: "🔦 கைவிளக்கு",
+        btnSun: "☀️ சூரியன்",
+        lblShape: "2. வடிவம்:",
+        btnRectangle: "செவ்வகம்",
+        btnCircle: "கோளம்",
+        btnTriangle: "முக்கோணம்",
+        lblTrans: "3. ஊடுருவல்:",
+        btnOpaque: "🪵 ஒளி புகா",
+        btnTranslucent: "🥛 பகுதி ஒளி புகும்",
+        btnTransparent: "🔍 ஒளி புகும்",
+        lblSpectrum: "🌈 நிறமாலை நிறம்:",
+        lblBrightness: "💡 பிரகாசம்:",
+        lblSunAngle: "☀️ சூரிய கோணம் / நேரம்:",
+        lblMorning: "காலை",
+        lblEvening: "மாலை",
+        screenTitle: "நிழல் திரை",
+        distLabel: "தூரம்",
+        shadowLenLabel: "நிழலின் நீளம்",
+        conclusion: "🔍 அறிவியல் முடிவு: ஒளியின் நிறம் வெளிச்சத்தை மட்டுமே மாற்றும். நிழலின் நிறம் எப்போதும் கருமையே!",
+        timeMorning: "காலை",
+        timeForenoon: "முற்பகல்",
+        timeNoon: "நண்பகல்",
+        timeAfternoon: "பிற்பகல்",
+        timeEvening: "மாலை"
+      }
+    };
+
+    let currentLang = 'zh';
+
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const light = { 
+      x: 100, 
+      y: 240, 
+      radius: 20, 
+      type: 'flashlight', 
+      opacity: 0.7,
+      colorHex: '#FFEE58',
+      colorRgbaBase: 'rgba(255, 235, 59,'
+    };
+    
+    const obstacle = { 
+      x: 390, 
+      y: 180, 
+      width: 25, 
+      height: 100, 
+      shape: 'rectangle', 
+      transparency: 'opaque'
+    };
+    const wallX = 640;
+
+    const sunSky = {
+      centerX: 500,
+      centerY: 370,
+      radius: 320,
+      angleDeg: 30
+    };
+
+    let isDragging = false;
+
+    function setLanguage(lang, btnElem) {
+      currentLang = lang;
+      const buttons = document.querySelectorAll('.lang-btn');
+      buttons.forEach(b => b.classList.remove('active'));
+      btnElem.classList.add('active');
+
+      const t = translations[lang];
+      document.getElementById('title').innerText = t.title;
+      document.getElementById('subtitle').innerText = t.subtitle;
+      document.getElementById('lblLight').innerText = t.lblLight;
+      document.getElementById('btnFlashlight').innerText = t.btnFlashlight;
+      document.getElementById('btnSun').innerText = t.btnSun;
+      document.getElementById('lblShape').innerText = t.lblShape;
+      document.getElementById('btnRectangle').innerText = t.btnRectangle;
+      document.getElementById('btnCircle').innerText = t.btnCircle;
+      document.getElementById('btnTriangle').innerText = t.btnTriangle;
+      document.getElementById('lblTrans').innerText = t.lblTrans;
+      document.getElementById('btnOpaque').innerText = t.btnOpaque;
+      document.getElementById('btnTranslucent').innerText = t.btnTranslucent;
+      document.getElementById('btnTransparent').innerText = t.btnTransparent;
+      document.getElementById('lblSpectrum').innerText = t.lblSpectrum;
+      document.getElementById('lblBrightness').innerHTML = `${t.lblBrightness} <strong id="brightnessLabel" style="color: #000000; font-size: 17px;">${Math.round(light.opacity*100)}%</strong>`;
+      document.getElementById('lblSunAngle').innerText = t.lblSunAngle;
+      document.getElementById('lblMorning').innerText = t.lblMorning;
+      document.getElementById('lblEvening').innerText = t.lblEvening;
+
+      updateSunAngle(sunSky.angleDeg);
+      draw();
+    }
+
+    function changeLightType(type) {
+      light.type = type;
+      document.getElementById('btnFlashlight').classList.toggle('active', type === 'flashlight');
+      document.getElementById('btnSun').classList.toggle('active', type === 'sun');
+
+      if (type === 'flashlight') {
+        document.getElementById('flashlightSliderBox').style.display = 'flex';
+        document.getElementById('sunSliderBox').style.display = 'none';
+        canvas.style.cursor = 'grab';
+      } else {
+        document.getElementById('flashlightSliderBox').style.display = 'none';
+        document.getElementById('sunSliderBox').style.display = 'flex';
+        canvas.style.cursor = 'default';
+      }
+      draw();
+    }
+
+    function changeShape(shape) {
+      obstacle.shape = shape;
+      document.getElementById('btnRectangle').classList.toggle('active', shape === 'rectangle');
+      document.getElementById('btnCircle').classList.toggle('active', shape === 'circle');
+      document.getElementById('btnTriangle').classList.toggle('active', shape === 'triangle');
+      draw();
+    }
+
+    function changeTransparency(trans) {
+      obstacle.transparency = trans;
+      document.getElementById('btnOpaque').classList.toggle('active', trans === 'opaque');
+      document.getElementById('btnTranslucent').classList.toggle('active', trans === 'translucent');
+      document.getElementById('btnTransparent').classList.toggle('active', trans === 'transparent');
+      draw();
+    }
+
+    function changeLightColor(hex, rgbaBase, btnElem) {
+      light.colorHex = hex;
+      light.colorRgbaBase = rgbaBase;
+
+      const buttons = document.querySelectorAll('.color-btn');
+      buttons.forEach(b => b.classList.remove('active'));
+      btnElem.classList.add('active');
+
+      draw();
+    }
+
+    function updateBrightness(val) {
+      light.opacity = parseFloat(val) / 100;
+      document.getElementById('brightnessLabel').innerText = `${val}%`;
+      draw();
+    }
+
+    function updateSunAngle(val) {
+      sunSky.angleDeg = parseFloat(val);
+      const timeLabel = document.getElementById('timeLabel');
+      const angle = sunSky.angleDeg;
+      const t = translations[currentLang];
+
+      if (angle < 45) {
+        timeLabel.innerText = `08:00 AM (${t.timeMorning} - ${Math.round(angle)}°)`;
+      } else if (angle < 75) {
+        timeLabel.innerText = `10:00 AM (${t.timeForenoon} - ${Math.round(angle)}°)`;
+      } else if (angle >= 75 && angle <= 105) {
+        timeLabel.innerText = `12:00 PM (${t.timeNoon} - ${Math.round(angle)}°)`;
+      } else if (angle <= 135) {
+        timeLabel.innerText = `03:00 PM (${t.timeAfternoon} - ${Math.round(angle)}°)`;
+      } else {
+        timeLabel.innerText = `05:30 PM (${t.timeEvening} - ${Math.round(angle)}°)`;
+      }
+      draw();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (light.type === 'sun') {
+        drawSunSimulation();
+      } else {
+        drawFlashlightSimulation();
+      }
+    }
+
+    function drawObstacle(x, y, w, h, shape, transparency) {
+      ctx.save();
+      if (transparency === 'opaque') {
+        ctx.fillStyle = '#8D6E63';
+        ctx.strokeStyle = '#3E2723';
+        ctx.lineWidth = 3;
+      } else if (transparency === 'translucent') {
+        ctx.fillStyle = 'rgba(129, 212, 250, 0.55)';
+        ctx.strokeStyle = '#01579B';
+        ctx.lineWidth = 3;
+      } else {
+        ctx.fillStyle = 'rgba(227, 242, 253, 0.15)';
+        ctx.strokeStyle = '#0288D1';
+        ctx.lineWidth = 2.5;
+      }
+
+      if (shape === 'circle') {
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2, h / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      } else if (shape === 'triangle') {
+        ctx.beginPath();
+        ctx.moveTo(x + w / 2, y);
+        ctx.lineTo(x, y + h);
+        ctx.lineTo(x + w, y + h);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x, y, w, h);
+      }
+
+      if (transparency !== 'opaque') {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x + w * 0.2, y + 10);
+        ctx.lineTo(x + w * 0.8, y + h - 10);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function getShadowAlpha() {
+      if (obstacle.transparency === 'opaque') return 0.85;
+      if (obstacle.transparency === 'translucent') return 0.25;
+      return 0.02;
+    }
+
+    function drawFlashlightSimulation() {
+      const t = translations[currentLang];
+      drawGrid();
+
+      const distancePixel = obstacle.x - light.x;
+      const distanceCm = Math.round(distancePixel / 10); 
+      const emitterX = light.x + 20;
+
+      const topSlope = (obstacle.y - light.y) / (obstacle.x - emitterX);
+      const shadowTopY = light.y + topSlope * (wallX - emitterX);
+
+      const bottomSlope = ((obstacle.y + obstacle.height) - light.y) / (obstacle.x - emitterX);
+      const shadowBottomY = light.y + bottomSlope * (wallX - emitterX);
+
+      const shadowHeightPixel = Math.abs(shadowBottomY - shadowTopY);
+
+      // 发散光束
+      ctx.fillStyle = `${light.colorRgbaBase} ${light.opacity * 0.45})`;
+      ctx.beginPath();
+      ctx.moveTo(emitterX, light.y);
+      ctx.lineTo(wallX, shadowTopY);
+      ctx.lineTo(wallX, shadowBottomY);
+      ctx.closePath();
+      ctx.fill();
+
+      if (obstacle.transparency !== 'opaque') {
+        const passAlpha = obstacle.transparency === 'transparent' ? 0.4 : 0.18;
+        ctx.fillStyle = `${light.colorRgbaBase} ${light.opacity * passAlpha})`;
+        ctx.fillRect(obstacle.x, obstacle.y - 30, wallX - obstacle.x, obstacle.height + 60);
+      }
+
+      // 侧墙
+      ctx.fillStyle = '#455A64';
+      ctx.fillRect(wallX, 40, 12, 400);
+
+      const shadowAlpha = getShadowAlpha() * light.opacity;
+      if (shadowAlpha > 0.05) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+        ctx.fillRect(wallX - 4, shadowTopY, 6, shadowHeightPixel);
+      }
+
+      drawObstacle(obstacle.x, obstacle.y, obstacle.width, obstacle.height, obstacle.shape, obstacle.transparency);
+      drawFlashlightBody();
+
+      // 距离标注（楷体 + 加粗）
+      ctx.strokeStyle = '#0D47A1';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(emitterX, light.y + 25);
+      ctx.lineTo(emitterX, light.y + 75);
+      ctx.moveTo(obstacle.x, obstacle.y + obstacle.height);
+      ctx.lineTo(obstacle.x, light.y + 75);
+      ctx.moveTo(emitterX, light.y + 65);
+      ctx.lineTo(obstacle.x, light.y + 65);
+      ctx.stroke();
+
+      ctx.fillStyle = '#000000';
+      ctx.font = '900 16px "楷体", "STKaiti", serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${t.distLabel}: ${distanceCm} cm`, (emitterX + obstacle.x) / 2, light.y + 58);
+
+      // 正面投影屏
+      const screenX = 700, screenY = 40, screenWidth = 270, screenHeight = 400;
+      
+      ctx.fillStyle = `${light.colorRgbaBase} 0.25)`;
+      ctx.strokeStyle = '#263238';
+      ctx.lineWidth = 3;
+      ctx.fillRect(screenX, screenY, screenWidth, screenHeight);
+      ctx.strokeRect(screenX, screenY, screenWidth, screenHeight);
+
+      ctx.fillStyle = '#000000';
+      ctx.font = '900 17px "楷体", "STKaiti", serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(t.screenTitle, screenX + screenWidth / 2, screenY + 32);
+
+      const centerX = screenX + screenWidth / 2;
+      const centerY = screenY + screenHeight / 2;
+
+      if (shadowAlpha > 0.05) {
+        ctx.fillStyle = `rgba(15, 23, 42, ${shadowAlpha})`;
+        if (obstacle.shape === 'circle') {
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, shadowHeightPixel / 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (obstacle.shape === 'triangle') {
+          const h = shadowHeightPixel, w = shadowHeightPixel * 0.75;
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY - h / 2);
+          ctx.lineTo(centerX - w / 2, centerY + h / 2);
+          ctx.lineTo(centerX + w / 2, centerY + h / 2);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          const h = shadowHeightPixel, w = shadowHeightPixel * 0.6;
+          ctx.fillRect(centerX - w / 2, centerY - h / 2, w, h);
+        }
+      }
+
+      // 结论文本：纯黑加粗大字
+      ctx.fillStyle = '#000000';
+      ctx.font = '900 17px "楷体", "STKaiti", serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(t.conclusion, canvas.width / 2, 492);
+    }
+
+    function drawFlashlightBody() {
+      ctx.save();
+      const flX = light.x, flY = light.y;
+      
+      ctx.fillStyle = isDragging ? '#1565C0' : '#263238';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.roundRect(flX - 55, flY - 10, 50, 20, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = '#78909C';
+      ctx.lineWidth = 2;
+      for (let i = -45; i <= -15; i += 8) {
+        ctx.beginPath();
+        ctx.moveTo(flX + i, flY - 8);
+        ctx.lineTo(flX + i, flY + 8);
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#D32F2F';
+      ctx.fillRect(flX - 35, flY - 14, 8, 4);
+
+      ctx.fillStyle = '#37474F';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(flX - 5, flY - 11);
+      ctx.lineTo(flX + 18, flY - 18);
+      ctx.lineTo(flX + 18, flY + 18);
+      ctx.lineTo(flX - 5, flY + 11);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = light.colorHex;
+      ctx.beginPath();
+      ctx.ellipse(flX + 18, flY, 4, 18, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawSunSimulation() {
+      const t = translations[currentLang];
+      const groundY = 370;
+      const objX = 500;
+      const objHeight = 110;
+      const objWidth = 36;
+
+      ctx.fillStyle = '#e0f7fa';
+      ctx.fillRect(0, 0, canvas.width, groundY);
+      
+      ctx.strokeStyle = '#80deea';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.arc(sunSky.centerX, sunSky.centerY, sunSky.radius, Math.PI, 2 * Math.PI);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#81c784';
+      ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+      
+      ctx.strokeStyle = '#2e7d32';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(0, groundY);
+      ctx.lineTo(canvas.width, groundY);
+      ctx.stroke();
+
+      const rad = (sunSky.angleDeg * Math.PI) / 180;
+      const sunX = sunSky.centerX - sunSky.radius * Math.cos(rad);
+      const sunY = sunSky.centerY - sunSky.radius * Math.sin(rad);
+
+      const topX = objX;
+      const topY = groundY - objHeight;
+      const dx = topX - sunX;
+      const dy = topY - sunY;
+      const shadowTipX = topX + (dx / dy) * (groundY - topY);
+
+      ctx.fillStyle = `${light.colorRgbaBase} 0.35)`;
+      ctx.beginPath();
+      ctx.moveTo(sunX, sunY);
+      ctx.lineTo(shadowTipX, groundY);
+      ctx.lineTo(objX, groundY);
+      ctx.closePath();
+      ctx.fill();
+
+      const shadowAlpha = getShadowAlpha();
+      if (shadowAlpha > 0.05) {
+        ctx.save();
+        ctx.fillStyle = `rgba(15, 23, 42, ${shadowAlpha})`;
+        ctx.beginPath();
+        ctx.moveTo(objX - objWidth / 2, groundY);
+        ctx.lineTo(objX + objWidth / 2, groundY);
+        ctx.lineTo(shadowTipX, groundY + 14);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      const rulerY = groundY + 50;
+      ctx.strokeStyle = '#b71c1c';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(objX, rulerY);
+      ctx.lineTo(shadowTipX, rulerY);
+      ctx.moveTo(objX, rulerY - 6);
+      ctx.lineTo(objX, rulerY + 6);
+      ctx.moveTo(shadowTipX, rulerY - 6);
+      ctx.lineTo(shadowTipX, rulerY + 6);
+      ctx.stroke();
+
+      drawObstacle(objX - objWidth / 2, groundY - objHeight, objWidth, objHeight, obstacle.shape, obstacle.transparency);
+
+      ctx.fillStyle = light.colorHex;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 26, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#BF360C';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      const shadowLengthCm = Math.abs(Math.round((shadowTipX - objX) / 5));
+      ctx.fillStyle = '#000000';
+      ctx.font = '900 16px "楷体", "STKaiti", serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${t.shadowLenLabel}: ${shadowLengthCm} cm`, (objX + shadowTipX) / 2, rulerY + 22);
+
+      // 卡片 (楷体 + 纯黑大字)
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = '#0D47A1';
+      ctx.lineWidth = 2.5;
+      ctx.fillRect(30, 25, 330, 95);
+      ctx.strokeRect(30, 25, 330, 95);
+
+      ctx.fillStyle = '#000000';
+      ctx.font = '900 17px "楷体", "STKaiti", serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${t.lblSunAngle.split(':')[0]}: ${Math.round(sunSky.angleDeg)}°`, 45, 56);
+      ctx.fillText(`📏 ${t.shadowLenLabel}: ${shadowLengthCm} cm`, 45, 87);
+
+      ctx.fillStyle = '#000000';
+      ctx.font = '900 17px "楷体", "STKaiti", serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(t.conclusion, canvas.width / 2, 492);
+    }
+
+    function drawGrid() {
+      ctx.strokeStyle = '#f0f0f0';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 50) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+    }
+
+    canvas.addEventListener('mousedown', (event) => {
+      if (light.type !== 'flashlight') return;
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+
+      if (Math.abs(mouseX - light.x) < 60 && Math.abs(mouseY - light.y) < 25) {
+        isDragging = true;
+        canvas.style.cursor = 'grabbing';
+        draw();
+      }
+    });
+
+    canvas.addEventListener('mousemove', (event) => {
+      if (isDragging && light.type === 'flashlight') {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        if (mouseX > 70 && mouseX < obstacle.x - 60) {
+          light.x = mouseX;
+          draw();
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        canvas.style.cursor = 'grab';
+        draw();
+      }
+    });
+
+    changeLightType('flashlight');
+  </script>
+</body>
+</html>
